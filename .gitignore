@@ -1,0 +1,23 @@
+# .gitignore
+# Чувствительные данные
+.env
+client_secret_*.json
+telegrambot4new-*.json
+
+# Кэш и временные файлы Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Логи
+logs/
+
+# Виртуальное окружение
+venv/
+
+# Загруженные файлы
+uploads/
+
+# Конфигурация редакторов
+.vscode/
