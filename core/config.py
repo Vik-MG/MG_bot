@@ -19,7 +19,9 @@ VIBER_BOT_TOKEN = os.getenv("VIBER_BOT_TOKEN")
 
 # Google API Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE")
+
+CREDENTIALS_FILE = "/etc/secrets/telegrambot4new-578a25fc7aa8.json"
+
 if not CREDENTIALS_FILE:
     logger.error("Переменная окружения CREDENTIALS_FILE не задана!")
     raise ValueError("Переменная окружения CREDENTIALS_FILE обязательна для работы приложения.")
