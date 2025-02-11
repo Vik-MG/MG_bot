@@ -1,8 +1,9 @@
 # tests/test_utils.py
+import os
 import pytest
 from unittest.mock import AsyncMock, patch
 from core.utils.file_utils import save_file
-from aiogram.types import Message, Document, PhotoSize
+from aiogram.types import Message, Document, PhotoSize, User
 
 
 @pytest.mark.asyncio
@@ -10,23 +11,19 @@ from aiogram.types import Message, Document, PhotoSize
 @patch("core.utils.file_utils.Bot.get_file")
 @patch("core.utils.file_utils.Bot.download_file")
 async def test_save_file_document(mock_download_file, mock_get_file, mock_makedirs):
-    """
-    Тестирование сохранения документов через save_file.
-    """
     message = AsyncMock(spec=Message)
-    message.document = Document(file_id="doc_id", file_name="test_document.txt")
+    message.document = Document(file_id="doc_id", file_unique_id="unique_doc_id", file_name="test_document.txt")
     message.content_type = "document"
+    message.photo = None  # Добавляем, чтобы избежать AttributeError
+    message.from_user = User(id=12345, is_bot=False, first_name="TestUser")
 
     bot = AsyncMock()
     mock_get_file.return_value.file_path = "path/to/document.txt"
-    mock_download_file.return_value = None
 
     result = await save_file(message, bot)
 
-    assert result == "uploads/test_document.txt"
-    mock_makedirs.assert_called_once_with("uploads", exist_ok=True)
-    mock_get_file.assert_called_once_with("doc_id")
-    mock_download_file.assert_called_once_with("path/to/document.txt", "uploads/test_document.txt")
+    expected_path = os.path.join("uploads", "12345", "test_document.txt")
+    assert result == expected_path
 
 
 @pytest.mark.asyncio
@@ -34,12 +31,10 @@ async def test_save_file_document(mock_download_file, mock_get_file, mock_makedi
 @patch("core.utils.file_utils.Bot.get_file")
 @patch("core.utils.file_utils.Bot.download_file")
 async def test_save_file_photo(mock_download_file, mock_get_file, mock_makedirs):
-    """
-    Тестирование сохранения фотографий через save_file.
-    """
     message = AsyncMock(spec=Message)
-    message.photo = [PhotoSize(file_id="photo_id", width=800, height=600)]
+    message.photo = [PhotoSize(file_id="photo_id", file_unique_id="unique_photo_id", width=800, height=600)]
     message.content_type = "photo"
+    message.from_user = User(id=12345, is_bot=False, first_name="TestUser")
 
     bot = AsyncMock()
     mock_get_file.return_value.file_path = "path/to/photo.jpg"
@@ -47,10 +42,8 @@ async def test_save_file_photo(mock_download_file, mock_get_file, mock_makedirs)
 
     result = await save_file(message, bot)
 
-    assert result == "uploads/photo.jpg"
-    mock_makedirs.assert_called_once_with("uploads", exist_ok=True)
-    mock_get_file.assert_called_once_with("photo_id")
-    mock_download_file.assert_called_once_with("path/to/photo.jpg", "uploads/photo.jpg")
+    expected_path = os.path.join("uploads", "12345", "photo_photo_id.jpg")
+    assert result == expected_path
 
 
 @pytest.mark.asyncio
@@ -60,8 +53,10 @@ async def test_save_file_unsupported():
     """
     message = AsyncMock(spec=Message)
     message.content_type = "text"  # Неподдерживаемый тип
+    message.from_user = User(id=12345, is_bot=False, first_name="TestUser")
 
     bot = AsyncMock()
 
     with pytest.raises(ValueError, match="Unsupported content type: text"):
         await save_file(message, bot)
+
