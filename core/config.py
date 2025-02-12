@@ -9,6 +9,12 @@ logger = setup_logger(__name__)
 # Загрузка переменных окружения из .env файла
 load_dotenv()
 
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+if not WEBHOOK_URL:
+    logger.error("Переменная окружения WEBHOOK_URL не задана!")
+    raise ValueError("Переменная окружения WEBHOOK_URL обязательна для работы Webhook.")
+
+
 # Telegram Bot Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
