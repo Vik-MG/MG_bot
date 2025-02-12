@@ -18,14 +18,11 @@ if not BOT_TOKEN:
 VIBER_BOT_TOKEN = os.getenv("VIBER_BOT_TOKEN")
 
 # Google API Configuration
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIALS_FILE = "/etc/secrets/telegrambot4new-578a25fc7aa8.json"  # Оставляем как есть!
 
-CREDENTIALS_FILE = "/etc/secrets/telegrambot4new-578a25fc7aa8.json"
-
-if not CREDENTIALS_FILE:
-    logger.error("Переменная окружения CREDENTIALS_FILE не задана!")
-    raise ValueError("Переменная окружения CREDENTIALS_FILE обязательна для работы приложения.")
-CREDENTIALS_FILE = os.path.join(BASE_DIR, CREDENTIALS_FILE)
+if not os.path.exists(CREDENTIALS_FILE):
+    logger.error("Файл учетных данных Google API отсутствует!")
+    raise ValueError("Файл учетных данных Google API обязателен для работы приложения.")
 
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 if not SPREADSHEET_ID:
