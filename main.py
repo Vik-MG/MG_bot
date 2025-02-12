@@ -1,11 +1,12 @@
 # main.py
 import asyncio
+import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from core.config import BOT_TOKEN
-from handlers import register_all_handlers
 from aiogram.types import BotCommand
-import logging
+from aiohttp import web
+from core.config import BOT_TOKEN, WEBHOOK_URL
+from handlers import register_all_handlers
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +20,6 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-
 async def set_commands(bot: Bot):
     """Установка команд бота."""
     commands = [
@@ -27,26 +27,22 @@ async def set_commands(bot: Bot):
     ]
     await bot.set_my_commands(commands)
 
+async def on_startup(app: web.Application):
+    """Функция запуска при старте сервера."""
+    register_all_handlers(dp)
+    await set_commands(bot)
+    await bot.set_webhook(WEBHOOK_URL)
+    logging.info("Бот запущен с Webhook!")
 
-async def main():
-    """Главная точка входа в приложение."""
-    try:
-        # Регистрация обработчиков
-        register_all_handlers(dp)
-        logging.info("Обработчики успешно зарегистрированы.")
+async def webhook_handler(request: web.Request):
+    """Обработчик запросов от Telegram."""
+    update = await request.json()
+    await dp.feed_webhook_update(bot, update)
+    return web.Response()
 
-        # Установка команд
-        await set_commands(bot)
-
-        # Запуск polling
-        logging.info("Бот запущен. Ожидание сообщений...")
-        await dp.start_polling(bot)
-    except Exception as e:
-        logging.error(f"Критическая ошибка при запуске: {e}", exc_info=True)
-    finally:
-        # Закрытие соединения бота
-        await bot.session.close()
-
+app = web.Application()
+app.router.add_post("/webhook", webhook_handler)
+app.on_startup.append(on_startup)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    web.run_app(app, host="0.0.0.0", port=8080)
