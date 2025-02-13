@@ -119,12 +119,12 @@ async def get_contacts(message: types.Message, state: FSMContext, bot: Bot):
                 client_interest = data.get("opt_project", "Камнеобработчик") if client_type == "оптовый" else data.get("item_interest", "Памятники/Другие изделия")
 
                 keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="📞 Связаться", callback_data=f"contact_{message.from_user.id}")],
+                    #[InlineKeyboardButton(text="📞 Связаться", callback_data=f"contact_{message.from_user.id}")],
                     [InlineKeyboardButton(text="📋 Подробнее", callback_data=f"details_{message.from_user.id}")]
                 ])
 
                 notification = (f"📝 *Новый заказ!*\n"
-                                f"📅 *Дата:* {timestamp}\n"
+                                f"📅 *Дата:* {timestamp}\n\n"
                                 f"👤 *Клиент:* {data.get('name', 'Unknown')}\n"
                                 f"📌 *Категория:* {client_category}\n"
                                 f"🔍 *Интерес:* {client_interest}\n"

@@ -35,28 +35,6 @@ async def get_valid_files(file_list: str):
     missing_files = [f for f in files if not os.path.exists(f)]
     return valid_files, missing_files
 
-@router.callback_query(lambda c: c.data.startswith("contact_"))
-async def send_contact(callback: CallbackQuery, bot: Bot):
-    """Отправляет контакт клиента, обновляет статус в таблице и скрывает кнопки."""
-    client_id = callback.data.split("_")[1]
-    sheet_name = determine_sheet_name(callback.message.text)
-
-    client_data = await get_client_data(sheet_name, client_id)
-    if not client_data:
-        await callback.message.answer("❌ Данные клиента не найдены.")
-        await callback.answer("Ошибка: клиент не найден.", show_alert=True)
-        return
-
-    phone_number = client_data[5] if len(client_data) > 5 else "Не указан"
-    status_updated = await update_client_status(sheet_name, client_id, "В работе")
-
-    new_text = (
-        f"📞 Телефон клиента: {phone_number}\n✅ Заявка помечена как 'В работе'." if status_updated else
-        f"📞 Телефон клиента: {phone_number}\n⚠ Ошибка обновления статуса в таблице."
-    )
-
-    await callback.message.edit_text(new_text)
-    await callback.answer("✅ Контакт отправлен менеджеру.")
 
 @router.callback_query(lambda c: c.data.startswith("details_"))
 async def send_details(callback: CallbackQuery, bot: Bot):

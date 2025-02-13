@@ -7,6 +7,7 @@ from aiogram.types import BotCommand
 from aiohttp import web
 from core.config import BOT_TOKEN, WEBHOOK_URL
 from handlers import register_all_handlers
+# from core.google_drive import upload_files_to_drive
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
