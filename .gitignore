@@ -3,6 +3,7 @@
 .env
 client_secret_*.json
 telegrambot4new-*.json
+uploadsbot-*.json
 
 # Кэш и временные файлы Python
 __pycache__/
