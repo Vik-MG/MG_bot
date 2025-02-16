@@ -15,6 +15,7 @@ project/
 ├── core/ 
 │ ├── config.py # Конфигурации 
 │ ├── google_sheets.py # Асинхронная работа с Google Sheets 
+│ ├── google_drive.py # # Хранение загруженных файлов в облаке
 │ ├── states.py # FSM состояния 
 │ ├── utils/ 
 │ ├── file_utils.py # Работа с файлами 
@@ -33,6 +34,7 @@ project/
 │ ├── test_handlers.py # Тесты для обработчиков 
 │ ├── test_utils.py # Тесты для утилит 
 │ ├── test_google_sheets.py # Тесты для Google Sheets 
+│ ├── test_google_drive.py # Тесты для Google Drive
 ├── uploads/ # Хранение загруженных файлов 
 ├── .env # Переменные окружения 
 ├── client_secret_*.json # Учетные данные Google API 
