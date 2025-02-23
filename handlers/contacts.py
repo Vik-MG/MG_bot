@@ -10,6 +10,7 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from core.utils.locales import get_text, load_user_languages  # Добавлен импорт мультиязычности
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -24,6 +25,9 @@ router = Router()
 def get_actual_files(user_id: int) -> list[str]:
     """Возвращает список всех файлов в папке пользователя."""
     user_folder = os.path.join("uploads", str(user_id))
+    if not os.path.exists(user_folder):
+        return []
+    
     return sorted([
         os.path.join(user_folder, f) for f in os.listdir(user_folder)
         if os.path.isfile(os.path.join(user_folder, f))
@@ -33,107 +37,92 @@ def get_actual_files(user_id: int) -> list[str]:
 async def get_contacts(message: types.Message, state: FSMContext, bot: Bot):
     """Обработка ввода контактов и сохранение данных в Google Sheets."""
     try:
-        logger.info(f"Начало обработки контактов. Пользователь: {message.from_user.id}, Контакты: {message.text}")
-        contacts = message.text
+        user_id = message.from_user.id
+        data = await state.get_data()
+        lang = data.get("language", load_user_languages().get(str(user_id), "ru"))  # Получаем язык пользователя
+        contacts = message.text.strip()
 
+        logger.info(f"Начало обработки контактов. Пользователь: {user_id}, Контакты: {contacts}")
         await state.update_data(contacts=contacts)
 
-        # Получаем все данные из FSM
-        data = await state.get_data()
-        logger.debug(f"Полученные данные FSM перед обновлением: {data}")
-
         # Загружаем актуальные файлы
-        await asyncio.sleep(2)  # Ожидаем запись файлов
-        actual_files = get_actual_files(message.from_user.id)
+        await asyncio.sleep(2)
+        actual_files = get_actual_files(user_id)
 
-        # Обновляем данные FSM один раз
-        await state.update_data(file_list=",".join(actual_files))
+        # Обновляем данные FSM
+        file_list = data.get("file_list", "")
+        if isinstance(file_list, str) and file_list:
+            file_list = file_list.split(",")
+        elif not isinstance(file_list, list):
+            file_list = []
 
-        # Проверяем количество файлов
-        saved_files_count = len(actual_files)
-        if saved_files_count != len(actual_files):
-            logger.warning(f"⚠️ Несоответствие файлов! В папке {saved_files_count}, в FSM {len(actual_files)}.")
+        file_list.extend(actual_files)
+        file_list = sorted(set(file_list))  # Убираем дубликаты
 
+        await state.update_data(file_list=",".join(file_list))
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        def prepare_data_and_headers(client_type: str):
-            """Формирует заголовки и строки для Google Sheets."""
-            if client_type == "оптовый":
-                return "Оптовые клиенты", ["Имя клиента", "ID", "Проект", "Файлы", "Комментарий", "Контакты", "Дата", "Кол-во", "Статус"], [
-                    data.get("name", ""),
-                    message.from_user.id,
-                    data.get("opt_project", ""),
-                    ", ".join(actual_files),
-                    data.get("combined_comment", "").strip(),
-                    contacts,
-                    timestamp,
-                    saved_files_count,
-                    "Новый"
-                ]
-            elif client_type == "розничный":
-                return "Розничные клиенты", ["Имя клиента", "ID", "Проект", "Кладбище", "Файлы", "Комментарий", "Контакты", "Дата", "Кол-во", "Статус"], [
-                    data.get("name", ""),
-                    message.from_user.id,
-                    data.get("item_interest", ""),
-                    data.get("cemetery", ""),
-                    ", ".join(actual_files),
-                    data.get("combined_comment", "").strip(),
-                    contacts,
-                    timestamp,
-                    saved_files_count,
-                    "Новый"
-                ]
-            else:
-                logger.error("❌ Неизвестный тип клиента.")
-                return None, None, None
 
         # Определяем тип клиента
         client_type = data.get("client_type", "").lower()
-        sheet_name, headers, row = prepare_data_and_headers(client_type)
+        sheet_name = "Оптовые клиенты" if client_type == "оптовый" else "Розничные клиенты"
 
-        if not sheet_name:
-            await message.answer("⚠ Ошибка: тип клиента не указан. Обратитесь к администратору.")
-            return
+        # Формируем данные в зависимости от типа клиента
+        if client_type == "оптовый":
+            headers = ["Имя клиента", "ID", "Проект", "Файлы", "Комментарий", "Контакты", "Дата", "Кол-во", "Статус"]
+            row = [
+                data.get("name", ""),
+                user_id,
+                data.get("opt_project", ""),
+                ", ".join(file_list),
+                data.get("combined_comment", "").strip(),
+                contacts,
+                timestamp,
+                len(file_list),
+                "Новый"
+            ]
+        else:  # Розничный клиент
+            headers = ["Имя клиента", "ID", "Проект", "Кладбище", "Файлы", "Комментарий", "Контакты", "Дата", "Кол-во", "Статус"]
+            row = [
+                data.get("name", ""),
+                user_id,
+                data.get("item_interest", ""),
+                data.get("cemetery", ""),
+                ", ".join(file_list),
+                data.get("combined_comment", "").strip(),
+                contacts,
+                timestamp,
+                len(file_list),
+                "Новый"
+            ]
 
         # Запись в Google Sheets
         try:
             worksheet = await get_google_sheet(sheet_name)
-            logger.debug(f"Лист {sheet_name} успешно получен.")
-
             await initialize_google_sheet(worksheet, headers)
-            logger.debug(f"Заголовки {headers} успешно инициализированы.")
-
-            if row:
-                await worksheet.append_row(row)
-                logger.info(f"✅ Данные успешно записаны: {row}")
-            else:
-                logger.error("❌ Ошибка: пустая строка для записи.")
-                await message.answer("⚠ Ошибка записи данных. Попробуйте позже.")
-                return
-
-            await message.answer("Спасибо! Ваш запрос сохранён. Мы свяжемся с вами в ближайшее время.")
+            await worksheet.append_row(row)
+            logger.info(f"✅ Данные успешно записаны: {row}")
+            await message.answer(get_text(lang, "thank_you"))  # Локализованное сообщение
 
             # Уведомление менеджера
             if MANAGER_ID:
-                client_category = "Оптовый" if client_type == "оптовый" else "Розничный"
-                client_interest = data.get("opt_project", "Камнеобработчик") if client_type == "оптовый" else data.get("item_interest", "Памятники/Другие изделия")
-
                 keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    #[InlineKeyboardButton(text="📞 Связаться", callback_data=f"contact_{message.from_user.id}")],
-                    [InlineKeyboardButton(text="📋 Подробнее", callback_data=f"details_{message.from_user.id}")]
+                    [InlineKeyboardButton(text="📋 Подробнее", callback_data=f"details_{user_id}")]
                 ])
-
-                notification = (f"📝 *Новый заказ!*\n"
-                                f"📅 *Дата:* {timestamp}\n\n"
-                                f"👤 *Клиент:* {data.get('name', 'Unknown')}\n"
-                                f"📌 *Категория:* {client_category}\n"
-                                f"🔍 *Интерес:* {client_interest}\n"
-                                f"🗒 *Комментарий:* {data.get('combined_comment', '').strip()}\n"
-                                f"📂 *Файлы:* {saved_files_count}")
-
+                notification = (f"📝 *{get_text(lang, 'new_order')}*\n"
+                                f"📅 *{get_text(lang, 'date')}:* {timestamp}\n\n"
+                                f"👤 *{get_text(lang, 'client')}:* {data.get('name', 'Unknown')}\n"
+                                f"📌 *{get_text(lang, 'category')}:* {client_type.capitalize()}\n"
+                                f"🗒 *{get_text(lang, 'comment')}:* {data.get('combined_comment', '').strip()}\n"
+                                f"📂 *{get_text(lang, 'files')}:* {len(file_list)}")
                 await bot.send_message(MANAGER_ID, notification, reply_markup=keyboard, parse_mode="Markdown")
+
         except Exception as e:
             logger.error(f"❌ Ошибка записи в Google Sheets: {e}")
-            await message.answer("⚠ Ошибка при записи данных. Попробуйте позже.")
+            await message.answer(get_text(lang, "error_saving_data"))
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при обработке контактов: {e}")
+        await message.answer(get_text(lang, "error_saving_data"))
+
     finally:
         await state.clear()

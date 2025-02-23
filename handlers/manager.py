@@ -8,6 +8,7 @@ from core.utils.logging_utils import setup_logger
 from core.google_sheets import get_google_sheet, update_client_status
 from html import escape
 from dotenv import load_dotenv
+from core.utils.locales import get_text, load_user_languages  # Добавлен импорт мультиязычности
 
 router = Router()
 logger = setup_logger(__name__)
@@ -35,7 +36,6 @@ async def get_valid_files(file_list: str):
     missing_files = [f for f in files if not os.path.exists(f)]
     return valid_files, missing_files
 
-
 @router.callback_query(lambda c: c.data.startswith("details_"))
 async def send_details(callback: CallbackQuery, bot: Bot):
     """Отправляет менеджеру всю информацию о клиенте + файлы и скрывает кнопки."""
@@ -44,23 +44,23 @@ async def send_details(callback: CallbackQuery, bot: Bot):
 
     client_data = await get_client_data(sheet_name, client_id)
     if not client_data:
-        await callback.message.answer("❌ Данные клиента не найдены.")
-        await callback.answer("Ошибка: клиент не найден.", show_alert=True)
+        await callback.message.answer(get_text("ru", "client_not_found"))  # Менеджер, скорее всего, русскоязычный
+        await callback.answer(get_text("ru", "error_client_not_found"), show_alert=True)
         return
 
     status_updated = await update_client_status(sheet_name, client_id, "Просмотрено")
     files_column_index = 3 if sheet_name == "Оптовые клиенты" else 4
 
     details_msg = (
-        f"📋 <b>Детали заказа:</b>\n"
-        f"👤 <b>Клиент:</b> {escape(client_data[0])}\n"
-        f"📌 <b>Категория:</b> {escape(client_data[2])}\n"
-        f"📂 <b>Файлы:</b> {escape(client_data[files_column_index])}\n"
-        f"🗒 <b>Комментарий:</b> {escape(client_data[files_column_index + 1])}\n"
-        f"📲 <b>Контакты:</b> {escape(client_data[files_column_index + 2])}\n"
-        f"📅 <b>Дата:</b> {escape(client_data[files_column_index + 3])}\n"
-        f"📁 <b>Кол-во файлов:</b> {escape(client_data[files_column_index + 4])}\n"
-        f"📝 <b>Статус:</b> {'✅ Обновлён' if status_updated else '⚠ Ошибка'}"
+        f"📋 <b>{get_text('ru', 'order_details')}:</b>\n"
+        f"👤 <b>{get_text('ru', 'client')}:</b> {escape(client_data[0])}\n"
+        f"📌 <b>{get_text('ru', 'category')}:</b> {escape(client_data[2])}\n"
+        f"📂 <b>{get_text('ru', 'files')}:</b> {escape(client_data[files_column_index])}\n"
+        f"🗒 <b>{get_text('ru', 'comment')}:</b> {escape(client_data[files_column_index + 1])}\n"
+        f"📲 <b>{get_text('ru', 'contacts')}:</b> {escape(client_data[files_column_index + 2])}\n"
+        f"📅 <b>{get_text('ru', 'date')}:</b> {escape(client_data[files_column_index + 3])}\n"
+        f"📁 <b>{get_text('ru', 'file_count')}:</b> {escape(client_data[files_column_index + 4])}\n"
+        f"📝 <b>{get_text('ru', 'status')}:</b> {'✅ ' + get_text('ru', 'updated') if status_updated else '⚠ ' + get_text('ru', 'error')}"
     )
 
     await callback.message.edit_text(details_msg, parse_mode="HTML")
@@ -69,8 +69,8 @@ async def send_details(callback: CallbackQuery, bot: Bot):
     valid_files, missing_files = await get_valid_files(client_data[files_column_index])
 
     if missing_files:
-        logger.warning(f"⚠ Следующие файлы не найдены: {missing_files}")
-        await callback.message.answer(f"⚠ Некоторые файлы не найдены:\n" + "\n".join(missing_files))
+        logger.warning(f"⚠ {get_text('ru', 'missing_files')}: {missing_files}")
+        await callback.message.answer(f"⚠ {get_text('ru', 'missing_files')}:\n" + "\n".join(missing_files))
 
     # Отправляем файлы по 10 за раз
     for i in range(0, len(valid_files), 10):
@@ -81,12 +81,12 @@ async def send_details(callback: CallbackQuery, bot: Bot):
             await bot.send_media_group(callback.message.chat.id, media_group)
             await asyncio.sleep(1)
         except Exception as e:
-            logger.error(f"Ошибка при отправке группы файлов: {e}")
-            await callback.message.answer("⚠ Ошибка при отправке файлов.")
+            logger.error(f"{get_text('ru', 'error_sending_files')}: {e}")
+            await callback.message.answer(get_text('ru', "error_sending_files"))
 
-    await callback.answer("✅ Информация отправлена менеджеру.")
+    await callback.answer(get_text("ru", "info_sent_to_manager"))
 
 @router.message(Command("sheet"))
 async def send_sheet_link(message: types.Message):
     """Отправляет ссылку на Google Sheets."""
-    await message.answer(f"📄 Ссылка на Google Sheets: {GOOGLE_SHEET_URL}", reply_markup=types.ReplyKeyboardRemove())
+    await message.answer(f"📄 {get_text('ru', 'sheet_link')}: {GOOGLE_SHEET_URL}", reply_markup=types.ReplyKeyboardRemove())
