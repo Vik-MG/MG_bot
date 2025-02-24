@@ -24,7 +24,9 @@ async def start_command(message: Message, state: FSMContext):
 
         # Проверка поддерживаемых языков, если не поддерживается – устанавливается русский
         supported_languages = ["ru", "uk", "pl", "en"]
-        user_lang = user_lang if user_lang in supported_languages else "ru"
+        user_lang = user_lang if user_lang in supported_languages else "en"
+        await message.answer("⚠ Your language is not supported. Defaulting to English. You can change it in the menu.")
+
 
         await state.update_data(language=user_lang)  # Сохраняем язык в FSM
         save_user_language(user_id, user_lang)  # Сохраняем язык в JSON
