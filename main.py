@@ -6,8 +6,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 from aiohttp import web
-from core.config import BOT_TOKEN, WEBHOOK_URL, USE_WEBHOOK  # Добавлен USE_WEBHOOK
+from core.config import BOT_TOKEN, WEBHOOK_URL
 from handlers import register_all_handlers
+from core.utils.locales import get_text, load_user_languages  # Импорт мультиязычности
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -25,66 +26,26 @@ dp = Dispatcher(storage=MemoryStorage())
 async def set_commands(bot: Bot):
     """Установка команд бота."""
     commands = [
-        BotCommand(command="/start", description="Запустить бота"),
+        BotCommand(command="/start", description=get_text("ru", "start_command")),  # Используем мультиязычность
     ]
     await bot.set_my_commands(commands)
 
-async def on_startup():
-    """Функция запуска при старте бота."""
-    try:
-        register_all_handlers(dp)
-        await set_commands(bot)
-
-        if USE_WEBHOOK:  # Добавлена логика переключения Webhook/Polling
-            if not WEBHOOK_URL:
-                logger.error("❌ Переменная WEBHOOK_URL не задана!")
-                exit("Ошибка: WEBHOOK_URL обязателен для работы Webhook.")
-            await bot.set_webhook(WEBHOOK_URL)
-            logger.info(f"✅ Бот запущен с Webhook: {WEBHOOK_URL}")
-        else:
-            await bot.delete_webhook()
-            logger.info("✅ Бот запущен в режиме Polling")
-    except Exception as e:
-        logger.error(f"Ошибка при запуске бота: {e}")
-        exit(1)
+async def on_startup(app: web.Application):
+    """Функция запуска при старте сервера."""
+    register_all_handlers(dp)
+    await set_commands(bot)
+    await bot.set_webhook(WEBHOOK_URL)
+    logger.info(get_text("ru", "bot_started_with_webhook"))  # Используем мультиязычность
 
 async def webhook_handler(request: web.Request):
     """Обработчик запросов от Telegram."""
-    try:
-        update = await request.json()
-        await dp.feed_webhook_update(bot, update)
-        return web.Response()
-    except Exception as e:
-        logger.error(f"Ошибка при обработке webhook: {e}")
-        return web.Response(status=500)
+    update = await request.json()
+    await dp.feed_webhook_update(bot, update)
+    return web.Response()
 
-async def on_shutdown():
-    """Функция корректного завершения работы бота."""
-    logger.info("🛑 Завершение работы бота...")
-    await dp.storage.close()
-    await dp.storage.wait_closed()
-
-async def main():
-    """Главная функция запуска."""
-    await on_startup()
-    
-    if USE_WEBHOOK:
-        app = web.Application()
-        app.router.add_post("/webhook", webhook_handler)
-        app.on_shutdown.append(on_shutdown)
-        logger.info("🌍 Запуск Webhook-сервера...")
-        web.run_app(app, host=os.getenv("HOST", "0.0.0.0"), port=int(os.getenv("PORT", 8080)))
-    else:
-        logger.info("🤖 Запуск Polling...")
-        try:
-            await dp.start_polling(bot)
-        except Exception as e:
-            logger.error(f"Ошибка в режиме Polling: {e}")
-        finally:
-            await on_shutdown()
+app = web.Application()
+app.router.add_post("/webhook", webhook_handler)
+app.on_startup.append(on_startup)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("⏹ Бот остановлен вручную.")
+    web.run_app(app, host="0.0.0.0", port=8080)
