@@ -22,18 +22,19 @@ async def start_command(message: Message, state: FSMContext):
         user_id = message.from_user.id
         user_lang = getattr(message.from_user, "language_code", "ru")[:2]  # Определение языка пользователя
 
-        # Проверка поддерживаемых языков, если не поддерживается – устанавливается русский
+        # Проверка поддерживаемых языков
         supported_languages = ["ru", "uk", "pl", "en"]
-        user_lang = user_lang if user_lang in supported_languages else "en"
-        await message.answer("⚠ Your language is not supported. Defaulting to English. You can change it in the menu.")
+        if user_lang not in supported_languages:
+            user_lang = "en"
+            await message.answer("⚠ Your language is not supported. Defaulting to English. You can change it in the menu.")
 
-
-        await state.update_data(language=user_lang)  # Сохраняем язык в FSM
-        save_user_language(user_id, user_lang)  # Сохраняем язык в JSON
+        # Сохраняем язык
+        await state.update_data(language=user_lang)
+        save_user_language(user_id, user_lang)
 
         logger.info(f"Пользователь {user_id} вызвал команду /start. Определен язык: {user_lang}")
 
-        # Отправляем сообщение с учетом языка
+        # Отправляем приветственное сообщение на нужном языке
         await message.answer(get_text(user_lang, "greeting"))
 
         # Устанавливаем следующее состояние
@@ -42,3 +43,4 @@ async def start_command(message: Message, state: FSMContext):
     except Exception as e:
         logger.error(f"Ошибка в /start у пользователя {user_id}: {e}", exc_info=True)
         await message.answer(get_text(user_lang, "error_occurred"))
+
