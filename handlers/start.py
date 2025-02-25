@@ -20,7 +20,7 @@ async def start_command(message: Message, state: FSMContext):
     """
     try:
         user_id = message.from_user.id
-        user_lang = getattr(message.from_user, "language_code", "ru")[:2]  # Определение языка пользователя
+        user_lang = getattr(message.from_user, "language_code", "en")[:2]  # Определение языка пользователя
 
         # Проверка поддерживаемых языков
         supported_languages = ["ru", "uk", "pl", "en"]
