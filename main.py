@@ -47,10 +47,10 @@ async def webhook_handler(request: web.Request):
 async def healthcheck(request):
     return web.Response(text="✅ Bot is alive")
 
-app.router.add_get("/", healthcheck)
 
 app = web.Application()
 app.router.add_post("/webhook", webhook_handler)
+app.router.add_get("/", healthcheck) # Добавляем маршрут для keep-alive
 app.on_startup.append(on_startup)
 
 if __name__ == "__main__":
