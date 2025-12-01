@@ -1,15 +1,17 @@
-# handlers/contacts.py 
+# handlers/contacts.py
 from aiogram import Router, types
+from aiogram import Bot
+from aiogram import F  # ДОБАВЛЕНО: фильтр F для обработки только контактов
 from aiogram.fsm.context import FSMContext
 from core.google_sheets import initialize_google_sheet, get_google_sheet
 from core.utils.logging_utils import setup_logger
 from core.states import Form
 from datetime import datetime
-from aiogram import Bot
 import os
 import asyncio
 from dotenv import load_dotenv
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+# from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton  # СТАРАЯ СТРОКА ИМПОРТА
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton  # НОВОЕ: добавлены ReplyKeyboardMarkup, KeyboardButton
 from core.utils.locales import get_text, load_user_languages  # Добавлен импорт мультиязычности
 
 # Загрузка переменных окружения
@@ -22,25 +24,30 @@ logger = setup_logger(__name__)
 # Создаём Router
 router = Router()
 
+
 def get_actual_files(user_id: int) -> list[str]:
     """Возвращает список всех файлов в папке пользователя."""
     user_folder = os.path.join("uploads", str(user_id))
     if not os.path.exists(user_folder):
         return []
-    
+
     return sorted([
         os.path.join(user_folder, f) for f in os.listdir(user_folder)
         if os.path.isfile(os.path.join(user_folder, f))
     ])
 
-@router.message(Form.contacts)
+
+# @router.message(Form.contacts)  # СТАРАЯ ВЕРСИЯ: принимала любой текст как "контакты"
+@router.message(Form.contacts, F.contact)  # НОВАЯ ВЕРСИЯ: обработчик срабатывает ТОЛЬКО на отправку контакта
 async def get_contacts(message: types.Message, state: FSMContext, bot: Bot):
     """Обработка ввода контактов и сохранение данных в Google Sheets."""
     try:
         user_id = message.from_user.id
         data = await state.get_data()
         lang = data.get("language", load_user_languages().get(str(user_id), "ru"))  # Получаем язык пользователя
-        contacts = message.text.strip()
+
+        # contacts = message.text.strip()  # СТАРАЯ ВЕРСИЯ: любой введённый текст считался контактами
+        contacts = message.contact.phone_number  # НОВАЯ ВЕРСИЯ: берём номер из контакта Telegram
 
         logger.info(f"Начало обработки контактов. Пользователь: {user_id}, Контакты: {contacts}")
         await state.update_data(contacts=contacts)
@@ -126,3 +133,27 @@ async def get_contacts(message: types.Message, state: FSMContext, bot: Bot):
 
     finally:
         await state.clear()
+
+
+# НОВЫЙ ОБРАБОТЧИК:
+# Не даёт пользователю "проскочить" дальше, если он пишет текст вместо отправки контакта
+@router.message(Form.contacts)
+async def ask_contact_strict(message: types.Message):
+    """
+    Пользователь находится в состоянии Form.contacts, но прислал не контакт.
+    Повторно просим отправить номер телефона через кнопку с request_contact.
+    """
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📱 Отправить номер телефона", request_contact=True)]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+
+    await message.answer(
+        "Для продолжения нужно отправить номер телефона.\n"
+        "Пожалуйста, нажмите кнопку ниже и поделитесь контактом.",
+        reply_markup=keyboard
+    )
+
