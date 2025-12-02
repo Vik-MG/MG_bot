@@ -69,13 +69,12 @@ async def get_contacts(message: types.Message, state: FSMContext, bot: Bot):
             logger.warning(f"Некорректный ввод номера: {user_input}")
 
             keyboard = ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text="📱 Отправить номер телефона", request_contact=True)]],
+                keyboard=[[KeyboardButton(text=get_text(lang, "send_phone_button"), request_contact=True)]],
                 resize_keyboard=True
             )
 
             await message.answer(
-                "Похоже, номер введён неверно.\n"
-                "Чтобы не ошибиться — нажмите кнопку ниже.",
+                get_text(lang, "invalid_phone"),
                 reply_markup=keyboard
             )
             return  # ВАЖНО: НЕ продолжаем, пока не будет нормального ввода
